@@ -1,0 +1,14 @@
+praat-parselmouth
+pandas
+chromadb
+numpy
+fastapi
+uvicorn[standard]
+python-multipart
+scikit-learn
+joblib
+pandas
+praat-parselmouth
+chromadb
+numpy
+python-dotenv 
