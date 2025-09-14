@@ -3,7 +3,7 @@ uvicorn[standard]==0.30.1
 pandas==2.2.2
 scikit-learn==1.5.0
 joblib==1.4.2
-parselmouth==1.1.1 # <--- ESSA LINHA FOI CORRIGIDA
+parselmouth==1.1.1
 psycopg2-binary==2.9.9
 SQLAlchemy==2.0.30
 python-dotenv==1.0.1
