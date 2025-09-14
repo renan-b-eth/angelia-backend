@@ -14,7 +14,7 @@ numpy
 python-dotenv 
 librosa
 soundfile
-parselmouth # Pode ser 'parselmouth-praat' dependendo da instalação
-psycopg2-binary # Driver PostgreSQL
-SQLAlchemy # ORM para interagir com o PostgreSQL
-python-dotenv # 
+parselmouth
+psycopg2-binary 
+SQLAlchemy 
+python-dotenv 
