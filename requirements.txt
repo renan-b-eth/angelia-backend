@@ -1,12 +1,12 @@
-fastapi==0.111.0 # Versão específica para evitar surpresas com o uvicorn
-uvicorn[standard]==0.30.1 # Versão específica para evitar surpresas
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
 pandas==2.2.2
 scikit-learn==1.5.0
 joblib==1.4.2
-parselmouth==0.4.3 # Use 'parselmouth' diretamente, é o mais comum
+parselmouth==1.1.1 # <--- ESSA LINHA FOI CORRIGIDA
 psycopg2-binary==2.9.9
 SQLAlchemy==2.0.30
 python-dotenv==1.0.1
-librosa==0.10.2.post1 # Se você realmente precisar para outras extrações, senão remova
-soundfile==0.12.1 # Dependência comum de librosa, se usar librosa
-numpy==1.26.4 # Essencial para pandas/scikit-learn/librosa
+librosa==0.10.2.post1
+soundfile==0.12.1
+numpy==1.26.4
