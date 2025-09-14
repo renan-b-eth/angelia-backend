@@ -1,36 +1,46 @@
-# angelia-backend/Dockerfile
+# angelia-backend/Dockerfi# angelia-backend/Dockerfile
 
 # Use uma imagem base Python oficial com Debian (mais completa e compatível)
 # 'slim-buster' é Debian 10, leve mas completa
 FROM python:3.10-slim-buster
 
-# 1. Instale as dependências do sistema operacional
-# Para ffmpeg: adicionamos repositórios e instalamos
-# Para postgresql-dev: instalamos o libpq-dev
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# 1. Configurar repositórios Debian para incluir 'contrib' e 'non-free'
+# Isso garante que codecs e outras dependências do ffmpeg, e talvez build-essential, sejam encontrados.
+# E então, atualize a lista de pacotes.
+RUN echo "deb http://deb.debian.org/debian buster main contrib non-free" > /etc/apt/sources.list.d/buster_main_contrib_non_free.list && \
+    echo "deb http://deb.debian.org/debian buster-updates main contrib non-free" >> /etc/apt/sources.list.d/buster_main_contrib_non_free.list && \
+    echo "deb http://security.debian.org/debian-security buster/updates main contrib non-free" >> /etc/apt/sources.list.d/buster_main_contrib_non_free.list && \
+    apt-get update
+
+# 2. Instalar as dependências do sistema operacional
+# libavformat-dev, libavcodec-dev, libavdevice-dev são comuns para ffmpeg-dev
+# ffmpeg é o pacote binário
+# libpq-dev é para PostgreSQL (psycopg2-binary)
+# build-essential é para compilação
+RUN apt-get install -y --no-install-recommends \
         ffmpeg \
         libpq-dev \
         build-essential \
+        # Bibliotecas adicionais que podem ser necessárias para compilação robusta de pacotes Python
+        pkg-config \
+        libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Defina o diretório de trabalho dentro do container
+# 3. Defina o diretório de trabalho dentro do container
 WORKDIR /app
 
-# 3. Copie APENAS o requirements.txt primeiro
+# 4. Copie APENAS o requirements.txt primeiro
 COPY requirements.txt .
 
-# 4. Instale as dependências Python *antes* de copiar o resto do código
-# Use --upgrade pip para garantir a versão mais recente e evitar problemas
-# O parâmetro --default-timeout=1000 aumenta o timeout para downloads, se for o caso
+# 5. Instale as dependências Python *antes* de copiar o resto do código
 RUN pip install --upgrade pip --default-timeout=1000 && \
     pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
-# 5. Copie todo o resto do seu código da API para o container
+# 6. Copie todo o resto do seu código da API para o container
 COPY . .
 
-# 6. Exponha a porta que a aplicação FastAPI vai usar
+# 7. Exponha a porta que a aplicação FastAPI vai usar
 EXPOSE 8000
 
-# 7. Comando para iniciar a aplicação FastAPI
+# 8. Comando para iniciar a aplicação FastAPI
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
