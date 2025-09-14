@@ -8,5 +8,5 @@ SQLAlchemy
 python-dotenv
 numpy
 librosa
-soundfile
-python-multipart # <--- NOVA DEPENDÊNCIA ADICIONADA AQUI
+soundfile # <--- REINTRODUZIDO AQUI
+python-multipart
