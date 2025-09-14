@@ -1,25 +1,21 @@
-# angelia-backend/Dockerfile - Versão Final e Robusta com FFMPEG e todas as suas libs
+# angelia-backend/Dockerfile
 
-# Use uma imagem base Python oficial com Debian Bullseye (mais recente e mantida)
+# Usar uma imagem base Python oficial com Debian Bullseye (mais recente e mantida)
 FROM python:3.10-slim-bullseye
 
-# Definição de variáveis de ambiente para otimização do Python e PIP
+# Definição de variáveis de ambiente para otimização
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=off \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100
 
-# 1. Instalar as dependências do sistema operacional necessárias
-#    Inclui ffmpeg para processamento de áudio, libpq-dev para PostgreSQL e build-essential para compilação.
+# 1. Instalar as dependências do sistema operacional
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
         libpq-dev \
         build-essential \
-        pkg-config \
-        libsndfile1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /var/cache/apt/*
+    && rm -rf /var/lib/apt/lists/*
 
 # 2. Defina o diretório de trabalho dentro do container
 WORKDIR /app
@@ -28,12 +24,9 @@ WORKDIR /app
 COPY requirements.txt .
 
 # 4. ATUALIZAÇÃO CRÍTICA: Atualizar as ferramentas de build ANTES de instalar os pacotes
-#    Isso é FUNDAMENTAL para resolver o erro 'use_2to3'.
-#    setuptools e wheel são tão importantes quanto pip para lidar com setup.py.
 RUN pip install --upgrade pip setuptools wheel
 
 # 5. Instale as dependências Python a partir do requirements.txt
-#    Permitimos compilação, pois parselmouth e outras libs precisam dela.
 RUN pip install -r requirements.txt
 
 # 6. Copie todo o resto do seu código da API para o container

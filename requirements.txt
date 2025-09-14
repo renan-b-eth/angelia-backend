@@ -7,6 +7,4 @@ parselmouth
 psycopg2-binary
 SQLAlchemy
 python-dotenv
-librosa
-soundfile
 numpy
