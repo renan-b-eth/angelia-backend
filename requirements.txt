@@ -1,20 +1,12 @@
-praat-parselmouth
-pandas
-chromadb
-numpy
-fastapi
-uvicorn[standard]
-python-multipart
-scikit-learn
-joblib
-pandas
-praat-parselmouth
-chromadb
-numpy
-python-dotenv 
-librosa
-soundfile
-parselmouth
-psycopg2-binary 
-SQLAlchemy 
-python-dotenv 
+fastapi==0.111.0 # Versão específica para evitar surpresas com o uvicorn
+uvicorn[standard]==0.30.1 # Versão específica para evitar surpresas
+pandas==2.2.2
+scikit-learn==1.5.0
+joblib==1.4.2
+parselmouth==0.4.3 # Use 'parselmouth' diretamente, é o mais comum
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.30
+python-dotenv==1.0.1
+librosa==0.10.2.post1 # Se você realmente precisar para outras extrações, senão remova
+soundfile==0.12.1 # Dependência comum de librosa, se usar librosa
+numpy==1.26.4 # Essencial para pandas/scikit-learn/librosa
