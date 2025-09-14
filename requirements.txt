@@ -1,3 +1,4 @@
+# angelia-backend/requirements.txt
 fastapi
 uvicorn[standard]
 pandas
@@ -7,6 +8,6 @@ parselmouth
 psycopg2-binary
 SQLAlchemy
 python-dotenv
-librosa
-soundfile
+# librosa  <-- REMOVIDO PARA SEMPRE
+# soundfile <-- REMOVIDO PARA SEMPRE (dependência comum de librosa)
 numpy
