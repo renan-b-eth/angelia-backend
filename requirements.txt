@@ -1,10 +1,12 @@
+# angelia-backend/requirements.txt
 fastapi
 uvicorn[standard]
 pandas
 scikit-learn
 joblib
-parselmouth
 psycopg2-binary
 SQLAlchemy
 python-dotenv
 numpy
+librosa
+soundfile
