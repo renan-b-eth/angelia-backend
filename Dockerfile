@@ -1,5 +1,8 @@
+# angelia-backend/Dockerfile
+
 # Use uma imagem base Python oficial com Debian (mais completa e compatível)
-FROM python:3.10-slim-buster # 'slim-buster' é Debian 10, leve mas completa
+# 'slim-buster' é Debian 10, leve mas completa
+FROM python:3.10-slim-buster
 
 # 1. Instale as dependências do sistema operacional
 # Para ffmpeg: adicionamos repositórios e instalamos
@@ -9,7 +12,7 @@ RUN apt-get update && \
         ffmpeg \
         libpq-dev \
         build-essential \
-        && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # 2. Defina o diretório de trabalho dentro do container
 WORKDIR /app
