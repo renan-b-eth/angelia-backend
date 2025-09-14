@@ -1,4 +1,4 @@
-# angelia-backend/Dockerfile
+# angelia-backend/Dockerfile - Versão Final e Definitiva
 
 # Usar uma imagem base Python oficial com Debian Bullseye (mais recente e mantida)
 FROM python:3.10-slim-bullseye
@@ -24,9 +24,11 @@ WORKDIR /app
 COPY requirements.txt .
 
 # 4. ATUALIZAÇÃO CRÍTICA: Atualizar as ferramentas de build ANTES de instalar os pacotes
+#    Isto resolve a causa raiz do erro 'use_2to3' para qualquer pacote que precise ser compilado.
 RUN pip install --upgrade pip setuptools wheel
 
 # 5. Instale as dependências Python a partir do requirements.txt
+#    Agora, sem o 'googleads' sendo puxado, esta etapa deve ser bem-sucedida.
 RUN pip install -r requirements.txt
 
 # 6. Copie todo o resto do seu código da API para o container
