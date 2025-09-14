@@ -1,6 +1,6 @@
-# angelia-backend/Dockerfile - Versão Final e Definitiva
+# angelia-backend/Dockerfile - Versão Final para isolar parselmouth e resolver googleads
 
-# Usar uma imagem base Python oficial com Debian Bullseye (mais recente e mantida)
+# Use uma imagem base Python oficial com Debian Bullseye (mais recente e mantida)
 FROM python:3.10-slim-bullseye
 
 # Definição de variáveis de ambiente para otimização
@@ -24,18 +24,26 @@ WORKDIR /app
 COPY requirements.txt .
 
 # 4. ATUALIZAÇÃO CRÍTICA: Atualizar as ferramentas de build ANTES de instalar os pacotes
-#    Isto resolve a causa raiz do erro 'use_2to3' para qualquer pacote que precise ser compilado.
 RUN pip install --upgrade pip setuptools wheel
 
-# 5. Instale as dependências Python a partir do requirements.txt
-#    Agora, sem o 'googleads' sendo puxado, esta etapa deve ser bem-sucedida.
+# 5. Instale parselmouth SEPARADAMENTE e sem suas dependências (muito arriscado, mas necessário para teste)
+#    Se parselmouth sozinho causar o erro googleads, ele é o problema.
+#    Esta etapa pode falhar se parselmouth tiver dependências compiladas que precisamos.
+RUN pip install --no-cache-dir --only-binary :all: parselmouth==1.1.1 || pip install --no-cache-dir parselmouth==1.1.1
+
+# 6. Remova parselmouth do requirements.txt temporariamente para o próximo passo.
+#    Isso é para evitar que pip tente instalar de novo, mas a versão que falhou será ignorada.
+RUN sed -i '/parselmouth/d' requirements.txt
+
+# 7. Instale o RESTO das dependências Python a partir do requirements.txt
+#    A flag --only-binary :all: foi removida, se não foi aplicada no parselmouth.
 RUN pip install -r requirements.txt
 
-# 6. Copie todo o resto do seu código da API para o container
+# 8. Copie todo o resto do seu código da API para o container
 COPY . .
 
-# 7. Exponha a porta que a aplicação FastAPI vai usar
+# 9. Exponha a porta que a aplicação FastAPI vai usar
 EXPOSE 8000
 
-# 8. Comando para iniciar a aplicação FastAPI
+# 10. Comando para iniciar a aplicação FastAPI
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
