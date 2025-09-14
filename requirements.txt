@@ -1,3 +1,4 @@
+# angelia-backend/requirements.txt
 fastapi
 uvicorn[standard]
 pandas
@@ -8,5 +9,6 @@ SQLAlchemy
 python-dotenv
 numpy
 librosa
-soundfile # <--- REINTRODUZIDO AQUI
+soundfile
 python-multipart
+boto3 # <--- Deve estar aqui
