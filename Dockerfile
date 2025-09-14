@@ -1,28 +1,29 @@
-# angelia-backend/Dockerfile
+# Use uma imagem base Python oficial com Alpine (leve e boa para deploys)
+FROM python:3.10-alpine
 
-# 1. Comece com uma imagem base oficial e leve do Python
-FROM python:3.11-slim
+# 1. Instale as dependências do sistema operacional (para FFmpeg e PostgreSQL)
+# Certifique-se de que o ffmpeg e os headers do postgresql-dev estejam instalados
+RUN apk add --no-cache ffmpeg build-base postgresql-dev
 
 # 2. Defina o diretório de trabalho dentro do container
 WORKDIR /app
 
-# 3. ATUALIZAÇÃO: Instale o ffmpeg e outras dependências do sistema AQUI
-#    Esta etapa é executada durante a construção da imagem, onde temos permissão de escrita.
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# 4. Copie o arquivo de dependências Python para o container
+# 3. Copie APENAS o requirements.txt primeiro
 COPY requirements.txt .
 
-# 5. Instale as dependências Python
-RUN pip install --no-cache-dir -r requirements.txt
+# 4. Instale as dependências Python *antes* de copiar o resto do código
+# Use --upgrade pip para garantir a versão mais recente e evitar problemas
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# 6. Copie todo o resto do seu código da API para o container
+# 5. Copie todo o resto do seu código da API para o container
+# Isso deve ser feito DEPOIS da instalação das dependências
+# para que o cache do Docker seja otimizado.
 COPY . .
 
-# 7. Exponha a porta que a aplicação vai usar
+# 6. Exponha a porta que a aplicação FastAPI vai usar
 EXPOSE 8000
 
-# 8. Defina o comando para iniciar a API quando o container rodar
+# 7. Comando para iniciar a aplicação FastAPI
+# Assegure que uvicorn esteja disponível e main seja o nome do seu arquivo principal
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
