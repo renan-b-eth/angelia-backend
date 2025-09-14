@@ -12,3 +12,5 @@ praat-parselmouth
 chromadb
 numpy
 python-dotenv 
+librosa
+soundfile
