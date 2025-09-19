@@ -6,9 +6,9 @@ scikit-learn
 joblib
 psycopg2-binary
 SQLAlchemy
-python-dtenv
+python-dotenv  # <-- CORREÇÃO AQUI
 numpy
 librosa
 soundfile
 python-multipart
-boto3 # <--- Deve estar aqui
+boto3
