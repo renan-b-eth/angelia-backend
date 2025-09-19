@@ -12,3 +12,5 @@ librosa
 soundfile
 python-multipart
 boto3
+scipy
+python-multipart # Necessário para upload de arquivos
