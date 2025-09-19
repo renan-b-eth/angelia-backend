@@ -1,8 +1,6 @@
-# angelia-backend/main.py (versão COMPLETA e FINAL com Cloudflare R2 e correção de tipos Numpy)
+# angelia-backend/main.py (Versão Refatorada - Foco no R2 e Nomes Estruturados, SEM DB)
 import os
 import shutil
-import pandas as pd
-import joblib
 import uuid
 from datetime import datetime, timezone
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
@@ -10,21 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import subprocess
 from pathlib import Path
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
 from dotenv import load_dotenv
-import librosa
-import numpy as np
-import io
-import soundfile as sf
+import re
 import boto3
 
 load_dotenv()
 
+# --- Constantes de Configuração ---
 BASE_DIR = Path(__file__).parent
-MODEL_PATH = BASE_DIR / "models/modelo_svm.pkl"
-DATABASE_URL = os.getenv("DATABASE_URL")
 
 # --- Variáveis de Ambiente para Cloudflare R2 ---
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
@@ -33,9 +24,7 @@ R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
 R2_PUBLIC_URL_BASE = os.getenv("R2_PUBLIC_URL_BASE")
 
-# Validação das variáveis de ambiente
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL não está configurada.")
+# Validação das variáveis de ambiente R2
 if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_PUBLIC_URL_BASE]):
     raise RuntimeError("Variáveis de ambiente R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_PUBLIC_URL_BASE são obrigatórias para Cloudflare R2.")
 
@@ -51,42 +40,26 @@ s3_client = boto3.client(
     region_name='auto' # R2 não usa regiões AWS tradicionais, 'auto' é comum com R2
 )
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class DatasetEntry(Base):
-    __tablename__ = "dataset_entries"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    audio_url = Column(String, index=True) 
-    diagnosis = Column(String, index=True)
-    age = Column(Integer)
-    gender = Column(String)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    mfcc_mean = Column(Float)
-    pitch_mean = Column(Float)
-    spectral_centroid_mean = Column(Float)
-    zero_crossing_rate_mean = Column(Float)
-
-Base.metadata.create_all(bind=engine)
-
+# --- Segurança ---
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 ALLOWED_ORIGINS = [FRONTEND_URL, "http://localhost:3000"]
 
+# --- Estruturas de Resposta ---
 class AddToDatasetResponse(BaseModel):
     message: str
-    audio_url: str
-    dataset_entry_id: str
+    saved_url: str # Agora retorna a URL do R2
 
-app = FastAPI(title="angel.ia Backend API", version="5.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-
-model = None
-try:
-    model = joblib.load(MODEL_PATH)
-    print(f"[API Startup] Modelo '{MODEL_PATH}' carregado.")
-except Exception as e:
-    print(f"[API Startup] AVISO: Modelo não carregado. Erro: {e}.")
+# --- Inicialização da API ---
+app = FastAPI(
+    title="angel.ia Backend API - Coleta de Áudio R2",
+    description="API para coleta de dados de áudio estruturados e salvamento no Cloudflare R2.",
+    version="1.0.0-r2-only"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS, allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
+)
 
 # --- Função para converter áudio para WAV usando ffmpeg ---
 def convert_to_wav_with_ffmpeg(input_path: Path, output_path: Path):
@@ -99,68 +72,73 @@ def convert_to_wav_with_ffmpeg(input_path: Path, output_path: Path):
         print(f"[ERRO FFmpeg] Falha na conversão. Stderr: {e.stderr}")
         return False
 
-# --- Função de Extração de Features com Librosa ---
-def extract_features_librosa(audio_path: Path) -> dict | None:
-    try:
-        y, sr = librosa.load(str(audio_path), sr=None)
-        
-        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-        mfcc_mean = np.mean(mfccs) if mfccs.size > 0 else 0.0
-
-        f0, _, _ = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C5'), sr=sr)
-        pitch_mean = np.mean(f0[f0 > 0]) if np.any(f0 > 0) else 0.0
-        
-        spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-        spectral_centroid_mean = np.mean(spectral_centroid) if spectral_centroid.size > 0 else 0.0
-        
-        zero_crossing_rate = librosa.feature.zero_crossing_rate(y)
-        zero_crossing_rate_mean = np.mean(zero_crossing_rate) if zero_crossing_rate.size > 0 else 0.0
-
-        # --- CORREÇÃO AQUI: Converter numpy types para float nativo Python ---
-        return {
-            'mfcc_mean': float(mfcc_mean),
-            'pitch_mean': float(pitch_mean),
-            'spectral_centroid_mean': float(spectral_centroid_mean),
-            'zero_crossing_rate_mean': float(zero_crossing_rate_mean)
-        }
-        # --- FIM DA CORREÇÃO ---
-    except Exception as e:
-        print(f"[ERRO Librosa] Falha na extração de features: {e}")
-        return None
+def sanitize_filename(name: str) -> str:
+    """Limpa uma string para ser usada como parte de um nome de arquivo."""
+    name = name.lower()
+    name = re.sub(r'\s+', '_', name) # Substitui espaços por underscores
+    name = re.sub(r'[^a-z0-9_.-]', '', name) # Permite letras, números, _, . e -
+    return name
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "Bem-vindo à API da angel.ia com Cloudflare R2!"}
+    return {"status": "ok", "message": "API angel.ia para Coleta de Áudio (R2)."}
 
 @app.post("/add-to-dataset/", response_model=AddToDatasetResponse)
-async def add_to_dataset(diagnosis: str = Form(...), age: int = Form(...), gender: str = Form(...), audio_file: UploadFile = File(...)):
-    db = SessionLocal()
-    temp_webm_path, temp_wav_path = None, None
-    audio_r2_url = None
+async def add_to_dataset(
+    # Campos base do formulário
+    patient_id: str = Form(...), # Novo campo para um ID único do paciente
+    diagnosis: str = Form(...),
+    age: int = Form(...),
+    gender: str = Form(...),
+    
+    # Novos campos baseados nos artigos científicos (recomendações)
+    task_type: str = Form(...), # Ex: "vogal_a_sustentada", "leitura_frase", "s_fricativo"
+    recording_environment: str = Form("desconhecido"), # Ex: "silencioso", "moderado", "barulhento"
+    symptoms: str = Form("nenhum"), # Ex: "fadiga_leve,estresse_alto", "nenhum"
+    medications: str = Form("nenhum"), # Ex: "levodopa", "nenhum"
+    
+    audio_file: UploadFile = File(...)
+):
+    temp_input_path, temp_wav_path = None, None
     try:
         print("[DEBUG] Iniciando processamento do áudio.")
+        
         # 1. Salva o arquivo original (webm) temporariamente no container
-        temp_webm_path = BASE_DIR / f"temp_input_{uuid.uuid4()}_{audio_file.filename}"
-        with temp_webm_path.open("wb") as buffer:
+        temp_input_path = BASE_DIR / f"temp_input_{uuid.uuid4()}_{audio_file.filename}"
+        with temp_input_path.open("wb") as buffer:
             shutil.copyfileobj(audio_file.file, buffer)
-        print(f"[DEBUG] WEBM temporário salvo em: {temp_webm_path}")
+        print(f"[DEBUG] WEBM temporário salvo em: {temp_input_path.name}")
 
         # 2. Converte o arquivo temporário (webm) para WAV usando ffmpeg no container
         temp_wav_path = BASE_DIR / f"temp_converted_{uuid.uuid4()}.wav"
-        if not convert_to_wav_with_ffmpeg(temp_webm_path, temp_wav_path):
-            print("[ERROR] Falha na conversão para WAV.")
+        if not convert_to_wav_with_ffmpeg(temp_input_path, temp_wav_path):
             raise HTTPException(400, "Falha ao converter áudio para WAV.")
-        print(f"[DEBUG] WAV convertido salvo em: {temp_wav_path}")
+        print(f"[DEBUG] WAV convertido salvo em: {temp_wav_path.name}")
         
-        # 3. Extrai features do arquivo WAV convertido com Librosa
-        features = extract_features_librosa(temp_wav_path)
-        if not features:
-            print("[ERROR] Falha na extração de features.")
-            raise HTTPException(400, "Falha ao extrair features do áudio após conversão.")
-        print(f"[DEBUG] Features extraídas: {features}")
-
-        # 4. Envia o arquivo WAV convertido para o R2 (usando cliente S3)
-        r2_object_key = f"audios/{uuid.uuid4()}.wav" # Caminho dentro do bucket R2
+        # --- Construir o nome de arquivo e caminho no R2 ---
+        sanitized_patient_id = sanitize_filename(patient_id)
+        sanitized_task_type = sanitize_filename(task_type)
+        timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        unique_id = str(uuid.uuid4())[:8] # ID curto para evitar colisões
+        
+        # Nome do arquivo no R2: {diagnostico}/{tipo_tarefa}/{id_paciente}_{idade}_{genero}_{sintomas}_{medicamentos}_{timestamp}_{uniqueid}.wav
+        # A pasta principal é o diagnóstico para fácil separação
+        r2_folder_path = sanitize_filename(diagnosis) # Ex: "parkinson", "saudavel"
+        
+        # Exemplo de nome de arquivo: "parkinson_paciente123_35_masculino_sintomas_nenhum_meds_nenhum_vogal_a_20240101123000_abcde123.wav"
+        filename_parts = [
+            sanitized_patient_id,
+            str(age),
+            gender,
+            sanitize_filename(symptoms),
+            sanitize_filename(medications),
+            sanitized_task_type,
+            timestamp_str,
+            unique_id
+        ]
+        
+        r2_object_key = f"{r2_folder_path}/{'_'.join(filename_parts)}.wav"
+        
         print(f"[DEBUG] Tentando upload para R2. Bucket: {R2_BUCKET_NAME}, Key: {r2_object_key}")
         
         s3_client.upload_file(str(temp_wav_path), R2_BUCKET_NAME, r2_object_key)
@@ -170,26 +148,19 @@ async def add_to_dataset(diagnosis: str = Form(...), age: int = Form(...), gende
         audio_r2_url = f"{R2_PUBLIC_URL_BASE}/{r2_object_key}"
         print(f"[DEBUG] URL pública do R2: {audio_r2_url}")
 
-        # 5. Salva a URL do R2 na base de dados
-        new_entry = DatasetEntry(audio_url=audio_r2_url, diagnosis=diagnosis, age=age, gender=gender, **features)
-        db.add(new_entry)
-        db.commit()
-        db.refresh(new_entry)
-        print(f"[DEBUG] Entrada no banco de dados criada com ID: {new_entry.id}")
-
-        return {"message": "Dados adicionados com sucesso!", "audio_url": audio_r2_url, "dataset_entry_id": new_entry.id}
-    except HTTPException:
-        raise
+        return AddToDatasetResponse(
+            message="Áudio adicionado ao dataset no Cloudflare R2 com sucesso!",
+            saved_url=audio_r2_url
+        )
     except Exception as e:
-        db.rollback()
-        print(f"[ERRO R2/Interno] Falha no processamento: {e}") # Captura qualquer erro
+        print(f"[ERRO R2/Interno] Falha no processamento: {e}")
         raise HTTPException(500, f"Erro interno no servidor ao processar o áudio: {e}")
     finally:
         print("[DEBUG] Iniciando limpeza de arquivos temporários.")
-        if temp_webm_path and temp_webm_path.exists():
-            os.remove(temp_webm_path)
-            print(f"[DEBUG] Removido temp_webm_path: {temp_webm_path}")
+        if temp_input_path and temp_input_path.exists():
+            os.remove(temp_input_path)
+            print(f"[DEBUG] Removido temp_input_path: {temp_input_path.name}")
         if temp_wav_path and temp_wav_path.exists():
             os.remove(temp_wav_path)
-            print(f"[DEBUG] Removido temp_wav_path: {temp_wav_path}")
+            print(f"[DEBUG] Removido temp_wav_path: {temp_wav_path.name}")
         print("[DEBUG] Limpeza de arquivos temporários concluída.")
